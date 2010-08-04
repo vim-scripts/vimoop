@@ -1,0 +1,5 @@
+This is a mirror of http://www.vim.org/scripts/script.php?script_id=3189
+
+Provides inheritance, uses __init__ function as a constructor. This plugin was used to create YAML parser (vimscript #3190) by rewriting Python code in vimscript.
+
+Documentation: http://kp-pav.narod2.ru/vim/doc/oop.txt.html
