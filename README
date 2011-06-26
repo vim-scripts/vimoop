@@ -5,4 +5,4 @@ Provides inheritance, uses __init__ function as a constructor. This plugin was u
 Documentation: http://vimpluginloader.sourceforge.net/doc/oop.txt.html
 Project page: http://sourceforge.net/projects/vimoop
 Dependencies (you do not need to install them by yourself, see installation details):
-vimscript #3184, http://sourceforge.net/projects/vimpluginloader
+vimscript #3631, https://bitbucket.org/ZyX_I/frawor
