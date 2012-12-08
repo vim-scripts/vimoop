@@ -2,7 +2,7 @@
 scriptencoding utf-8
 if !exists('s:_pluginloaded')
     execute frawor#Setup('1.0', {'@/functions': '0.0',
-                \                       '@oop': '1.0',
+                \                         '@.': '1.0',
                 \                '@/resources': '0.0',
                 \                      '@/fwc': '0.0',}, 0)
     call map(['oop', 'bi'], 'extend(s:F, {v:val : {}})')

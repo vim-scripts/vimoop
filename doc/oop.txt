@@ -51,6 +51,7 @@ done by vim, if you want to use |call()| instead, use >
 ------------------------------------------------------------------------------
 2.2. Resources                                                 *oop-resources*
                                                                  *oop-r-pyoop*
+See |frawor-f-addresource| for information about how resource is obtained.
 
 pyoop.instanceof :: name, instance -> Bool            *oop-r-pyoop.instanceof*
         Returns true if {instance} is an instance of class {name}.

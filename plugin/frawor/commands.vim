@@ -127,14 +127,11 @@ function s:F.delcommands(plugdict, fdict)
                 \type(a:plugdict.g._commands)!=type([])
         return
     endif
-    let d={}
-    while !empty(a:plugdict.g._commands)
-        let d.cmdname=remove(a:plugdict.g._commands, 0)
-        if type(d.cmdname)==type('') && d.cmdname=~#'^\u' &&
-                    \exists(':'.d.cmdname)==2
-            execute 'delcommand' d.cmdname
-        endif
-    endwhile
+    for cmd in filter(copy(a:plugdict.g._commands),
+                \     'type(v:val)=='.type('').' && v:val=~#"\\v^\\u\\w+$" && '.
+                \     'exists(":".v:val)')
+        execute 'delcommand' cmd
+    endfor
 endfunction
 call s:_f.newfeature('delcommands', {'unloadpre': s:F.delcommands,
             \                         'register': s:F.add_commands,
@@ -284,8 +281,8 @@ function s:F.command.add(plugdict, fdict, cid, cstr, copts)
                 \'funs': [],
                 \  'fs': {},
                 \}
-    if a:plugdict.type is# 'ftplugin'
-        let cmd.filetype=matchstr(a:plugdict.id, '\v^[^/]*', 9)
+    if a:plugdict.isftplugin
+        let cmd.filetype=matchstr(a:plugdict.id, '\v\/@<=[^/]+')
     endif
     let cmdstring=''
     let addargs=[]
@@ -294,7 +291,7 @@ function s:F.command.add(plugdict, fdict, cid, cstr, copts)
     let cmd.rsp=s:F.getspfunc(a:plugdict.id, a:cid, a:copts, 'r')
     "▶3 Create :command -options
     for [key, value] in sort(items(s:cmddefaults))
-        if a:plugdict.type is# 'ftplugin' && key is# 'buffer'
+        if a:plugdict.isftplugin && key is# 'buffer'
             let value=1
         elseif has_key(a:copts, key)
             "▶4 Completion

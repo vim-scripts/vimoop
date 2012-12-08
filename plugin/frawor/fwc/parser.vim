@@ -145,24 +145,29 @@ function s:parser.readreg(endstr)
         call self.throw('unmatchp', a:endstr)
     endif
     call self.removestr(len(c))
+    let c=c[:-2]
     try
         call matchstr('', c)
     catch
         call self.throw('invreg', c)
     endtry
-    return c[:-2]
+    return c
 endfunction
 "▶1 readflt    :: () + self → String|0 + self(s)
-"  {flt} :: ( "+" | "-" ) ( "nan" | "inf" | {unum} )
-" {unum} :: {d}* "."? {d}* ( "e" ( "+" | "-" )? [0-9]+ )?
+"  {flt} :: ( "+" | "-" ) ( "nan" | "inf" | {unum} | {hnum} | {onum} )
+" {unum} :: ( [1-9] {d}* | 0 )? ( "." {d}* )? ( "e" ( "+" | "-" )? [0-9]+ )?
 "    {d} :: [0-9] | "_"
+" {hnum} :: "0x" ( [0-9] | [a-f] | [A-F] | "_" )*
+" {onum} :: "0" ( [0-7] | "_" )+
 function s:parser.readflt()
     if !empty(self.ungot)
         call self.ungotjoin()
     endif
     call self.delblanks()
     let c=matchstr(self.s,
-                \'\v\c^[+-]? *%(nan|inf|[0-9_]*\.?[0-9_]*%(e[+-]?\d+)?)')
+                \'\v\c^[+-]?\ *%(nan|inf|0[0-7_]+|'.
+                \               '%(0|[1-9][0-9_]*)?%(\.[0-9_]*)?%(e[+-]?\d+)?|'.
+                \               '0x[0-9a-fA-F_]+)')
     call self.removestr(len(c))
     if empty(c)
         return 0
@@ -351,7 +356,8 @@ function s:parser.getstring()
         elseif c=~#'^\w'
             call self.add(c)
         else
-            call self.add('').ungetc(c)
+            call self.add('')
+            call self.ungetc(c)
         endif
     else
         call self.add('')
@@ -378,7 +384,8 @@ function s:parser.getpath()
     if c=~#'\v^[df]?r?[wWp]?x?$' && c!~#'\v^%(d%(.{,2}x|r)|r)'
         call self.add(c)
     else
-        call self.add('r').ungetc(c)
+        call self.add('r')
+        call self.ungetc(c)
     endif
     return self
 endfunction
@@ -426,14 +433,20 @@ function s:parser.getsubscr()
                 elseif v is# '$'
                     call self.getvar()
                 else
-                    call self.ungetc(v).getvar()
+                    call self.ungetc(v)
+                    call self.getvar()
                 endif
             endfor
             call self.conclose()
         elseif c is# '$'
-            call self.addcon().getvar().conclose()
+            call self.addcon()
+            call self.getvar()
+            call self.conclose()
         else
-            call self.addcon().ungetc(c).getvar().conclose()
+            call self.addcon()
+            call self.ungetc(c)
+            call self.getvar()
+            call self.conclose()
         endif
         let requiresdot=1
     endwhile
@@ -470,21 +483,40 @@ function s:parser.getddescr()
             if c is# '}'
                 break
             elseif c is# '/'
-                call self.addcon('regex', self.readreg('/')).scan().conclose()
+                call self.addcon('regex', self.readreg('/'))
+                call self.scan()
+                call self.conclose()
             elseif c is# '*'
-                call self.addcon('func').getfunc().scan().conclose()
+                call self.addcon('func')
+                call self.getfunc()
+                call self.scan()
+                call self.conclose()
             elseif c is# '='
-                call self.addcon('expr').getexpr().scan().conclose()
+                call self.addcon('expr')
+                call self.getexpr()
+                call self.scan()
+                call self.conclose()
             elseif c is# '?'
-                call self.addcon('check').scan().scan().conclose()
+                call self.addcon('check')
+                call self.scan()
+                call self.scan()
+                call self.conclose()
             elseif c is# '-'
-                call self.addcon('any').scan().conclose()
+                call self.addcon('any')
+                call self.scan()
+                call self.conclose()
             elseif c is# '"'
-                call self.addcon('eq', self.readstr()).scan().conclose()
+                call self.addcon('eq', self.readstr())
+                call self.scan()
+                call self.conclose()
             elseif c is# "'"
-                call self.addcon('eq', self.readsstr()).scan().conclose()
+                call self.addcon('eq', self.readsstr())
+                call self.scan()
+                call self.conclose()
             elseif c=~#'^\w'
-                call self.addcon('eq', c).scan().conclose()
+                call self.addcon('eq', c)
+                call self.scan()
+                call self.conclose()
             endif
         endwhile
     endif
@@ -530,7 +562,7 @@ function s:parser.getnumber()
         if c is# '$'
             return self.getvar()
         else
-            call self.ungetc(c)
+            return self.ungetc(c)
         endif
     elseif f[-3:] is# 'inf'
         let sign=f[0]
@@ -538,7 +570,7 @@ function s:parser.getnumber()
             let sign='+'
         endif
         return self.addcon('inf', sign).conclose()
-    elseif f is# 'nan'
+    elseif f[-3:] is# 'nan'
         return self.addcon('nan').conclose()
     endif
     let r=eval(f)
@@ -575,7 +607,8 @@ function s:parser.getchvar()
                 endif
             endwhile
         else
-            call self.ungetc(c).addcon('cur', 0)
+            call self.ungetc(c)
+            call self.addcon('cur', 0)
             while self.len
                 let c=self.readc()
                 if c is# '^'
@@ -613,7 +646,8 @@ function s:parser.getlist()
         elseif c=~#'^\w'
             call self.add(c)
         else
-            call self.ungetc(c).getvar()
+            call self.ungetc(c)
+            call self.getvar()
         endif
     endwhile
     return self.conclose()
@@ -631,12 +665,19 @@ endfunction
 "       | {chvar}
 "       | {expr}
 "       | {list}
+"       | {number}
 "       | context(evaluate, {var})
 "       | context(string, String)
 function s:parser.getvar()
     let c=self.readc()
-    if c=~#'^\w'
-        call self.addcon('plugvar').ungetc(c).getsubscr().conclose()
+    if c=~#'^\d' || c is# '+' || c is# '-'
+        call self.ungetc(c)
+        return self.getnumber()
+    elseif c=~#'^\w'
+        call self.addcon('plugvar')
+        call self.ungetc(c)
+        call self.getsubscr()
+        call self.conclose()
     elseif c is# '@'
         return self.getchvar()
     elseif c is# '='
@@ -646,11 +687,15 @@ function s:parser.getvar()
     elseif c is# '*'
         call self.getfunc()
     elseif c is# '$'
-        call self.addcon('evaluate').getvar().conclose()
+        call self.addcon('evaluate')
+        call self.getvar()
+        call self.conclose()
     elseif c is# '"'
-        call self.addcon('string', self.readstr()).conclose()
+        call self.addcon('string', self.readstr())
+        call self.conclose()
     elseif c is# "'"
-        call self.addcon('string', self.readsstr()).conclose()
+        call self.addcon('string', self.readsstr())
+        call self.conclose()
     elseif c is# '('
         call self.getvar()
         if self.readc() isnot# ')'
@@ -665,7 +710,8 @@ endfunction
 " Input: {var} ( "(" ( "." | {var} | "," )* ")"? )?
 " Output: context(func, {var}, ({var}|context(this))*)
 function s:parser.getfunc()
-    call self.addcon('func').getvar()
+    call self.addcon('func')
+    call self.getvar()
     if self.len
         let c=self.readc()
         if c is# '('
@@ -674,9 +720,11 @@ function s:parser.getfunc()
                 if c is# ')'
                     break
                 elseif c is# '.'
-                    call self.addcon('this').conclose()
+                    call self.addcon('this')
+                    call self.conclose()
                 elseif c isnot# ','
-                    call self.ungetc(c).getvar()
+                    call self.ungetc(c)
+                    call self.getvar()
                 endif
             endwhile
         else
@@ -717,7 +765,8 @@ function s:parser.scanfie(cname)
     elseif c is# '='
         call self.getexpr()
     else
-        call self.ungetc(c).intfunc()
+        call self.ungetc(c)
+        call self.intfunc()
     endif
     return self.conclose()
 endfunction
@@ -738,13 +787,17 @@ function s:parser.scanmsg()
                 if c is# ')'
                     break
                 elseif c is# '.'
-                    call self.addcon('curval').conclose()
+                    call self.addcon('curval')
+                    call self.conclose()
                 elseif c is# '%'
-                    call self.addcon('curarg').conclose()
+                    call self.addcon('curarg')
+                    call self.conclose()
                 elseif c is# '#'
-                    call self.addcon('curidx').conclose()
+                    call self.addcon('curidx')
+                    call self.conclose()
                 elseif c isnot# ','
-                    call self.ungetc(c).getvar()
+                    call self.ungetc(c)
+                    call self.getvar()
                 endif
             endwhile
         else
@@ -786,7 +839,9 @@ function s:parser.scan()
     call self.addcon('arg')
     "▶2 Default value
     if type is# 'optional' && c is# ':'
-        call self.addcon('defval').getvar().conclose()
+        call self.addcon('defval')
+        call self.getvar()
+        call self.conclose()
         let c=self.readc()
     endif
     "▶2 Define variables used to determine how to handle second word
@@ -812,7 +867,8 @@ function s:parser.scan()
             call self.scanmsg()
         elseif (!hastext || accepttext) && c=~#'^\w'
             let hastext=1
-            call self.ungetc(c).intfunc()
+            call self.ungetc(c)
+            call self.intfunc()
             if !accepttext
                 break
             endif
