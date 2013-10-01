@@ -1,15 +1,10 @@
 "{{{1 Первая загрузка
 scriptencoding utf-8
-if !exists('s:_pluginloaded')
-    execute frawor#Setup('1.0', {'@/functions': '0.0',
-                \                         '@.': '1.0',
-                \                '@/resources': '0.0',
-                \                      '@/fwc': '0.0',}, 0)
-    call map(['oop', 'bi'], 'extend(s:F, {v:val : {}})')
-    finish
-elseif s:_pluginloaded
-    finish
-endif
+execute frawor#Setup('1.0', {'@/functions': '0.0',
+            \                         '@.': '1.0',
+            \                '@/resources': '0.0',
+            \                      '@/fwc': '0.0',})
+call map(['oop', 'bi'], 'extend(s:F, {v:val : {}})')
 "{{{1 _messages
 if v:lang=~?'ru'
     let s:_messages={
